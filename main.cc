@@ -10,12 +10,7 @@
 #include "workflow/WFHttpServer.h"
 
 #include "ServiceCentreApp.hh"
-#include "Services.hh"
-#include "Base/TaskDispatcher.hh"
-#include "Base/Receiver.hh"
 
-IHttpTaskProcessor *pTP1 = nullptr, *pTP2 = nullptr;
-HttpTaskDispatcher testDisp;
 
 void process(WFHttpTask* server_task)
 {
@@ -30,10 +25,6 @@ void process(WFHttpTask* server_task)
 
 	printf("Func:%s Task %s ---- Current Task ID is %ld.\n", __func__, req->get_request_uri(), GetCurrentThreadId());
 
-
-	testDisp.Dispatch(server_task);
-    //pTP1->ProcessTask(server_task);
-    
 	if (strncmp(req->get_request_uri(), "/favicon.ico", 12) == 0)
 	{
 		return;
@@ -112,16 +103,6 @@ int main(int argc, const char* argv[])
 	ServiceCentreApp SCA(argc - 1, argv + 1);
 
     SCA.Start();
-	IService* pServ = SCA.LookForService("TaskService");
-
-	if (pServ)
-	{
-
-		//IHttpTaskProcessor* pTP = dynamic_cast<IHttpTaskProcessor*>(&alg);
-		pTP1 = dynamic_cast<IHttpTaskProcessor*>(pServ);
-	}
-
-	unsigned short port = 20855;
 
 
 	signal(SIGINT, sig_handler);
@@ -129,20 +110,15 @@ int main(int argc, const char* argv[])
 
 	printf("Func:%s  ---- Current Task ID is %ld.\n", __func__, GetCurrentThreadId());
 
-	WFHttpServer server(process);
 
-
-
-	testDisp.setProcessor("task", pTP1, PROCESS_ASYNC);
-	//port = atoi(argv[1]);
-	if (server.start(port) == 0)
+	if (1)
 	{
 #ifndef _WIN32
 		pause();
 #else
 		getchar();
 #endif
-		server.stop();
+		SCA.Stop();
 	}
 	else
 	{

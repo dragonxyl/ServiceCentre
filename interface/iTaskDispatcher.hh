@@ -13,10 +13,9 @@ enum ProcessType
 	PROCESS_SCRIPT
 };
 
-template<typename T>
 struct ITaskDispatcher
 {
-	
+    virtual const unsigned getDisperKey() const = 0;
 	/*!
 	 * \fn void setProcessor( std::string taskId, ITaskProcessor<T>* tp)
 	 * \brief 配置 任务处理接口
@@ -26,7 +25,7 @@ struct ITaskDispatcher
 	 * \param[in] taskId 任务uri（需要增加匹配正则）
 	 * \param[in] task 任务处理对象的指针
 	 **/
-	virtual void setProcessor(const std::string& taskKey, ITaskProcessor<T>* tp, ProcessType pt = PROCESS_SYNC) = 0;
+	virtual void setProcessor(const std::string& ProcKey, ITaskProcessor* tp, ProcessType pt = PROCESS_SYNC) = 0;
 
 	/*!
 	 * \fn void unsetProcessor(ITaskProcessor<T>* tp)
@@ -34,7 +33,7 @@ struct ITaskDispatcher
 	 * \remarks 在服务中心在停止任务处理服务前，务必先反注册该接口
 	 * \param[in] task 任务处理对象的指针
 	 **/
-	virtual void unsetProcessor(const std::string& taskKey, ITaskProcessor<T>* tp) = 0;
+	virtual void unsetProcessor(const std::string& ProcKey, ITaskProcessor* tp) = 0;
 
     /*!
 	 * \fn void Dispatch(ITaskProcessor<T>* tp)
@@ -42,9 +41,7 @@ struct ITaskDispatcher
 	 * \remarks 通过此接口实现任务派发
 	 * \param[in] task 任务处理对象的指针
 	 **/
-	virtual void Dispatch(T* task) = 0;
+	virtual void Dispatch(const std::string& taskKey, void* task) = 0;
 
 };
-
-using IHttpTaskDispatcher = ITaskDispatcher<WFHttpTask>;
 

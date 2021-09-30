@@ -4,11 +4,11 @@
 #include <set>
 
 #include "../Base/BaseService.hh"
+#include "../interface/iTaskDispatcher.hh"
+#include "../interface/iReceiver.hh"
 
 
-class Receiver;
-
-class CommuService:public BaseService, public IHttpTaskDispatcher
+class CommuService:public BaseService
 {
 public:
     CommuService(const char* serviceName) :BaseService(serviceName){};
@@ -24,21 +24,22 @@ public:
 
 	virtual void Finalize();
 
-
-	//IHttpTaskDispatcher½Ó¿Ú
-    virtual void setProcessor( std::string taskId, IHttpTaskProcessor* tp, ProcessType pt = PROCESS_SYNC);
-	virtual void unsetProcessor(IHttpTaskProcessor* tp);
-
 private:
 
 	void LoadConfigFile();
 
-//	void log_file_create_or_renew();
+	void GenarateDispatchers();
 
-	void UpdateFunctors();
+	void GenarateReceivers();
+
+	void SetDispatcherProcessor(std::shared_ptr<ITaskDispatcher> pDisp, const std::string& ProcKey, const std::string& ServiceName);
+
+
 private:
 
-    std::vector<Receiver*> m_re
-    std::unordered_map<int, ITaskDispatcher<TASK>*>
+    std::vector<std::shared_ptr<ITaskDispatcher> > m_Dispatchers;
+    std::vector<std::shared_ptr<IReceiver> > m_Receivers;
+
+    std::unordered_map<int, std::set<int> > receiverToDispers;
 
 }; 

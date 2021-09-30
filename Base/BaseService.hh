@@ -6,7 +6,6 @@ class BaseService:public IService
 {
 public:
     BaseService(const char* serviceName) :m_ServiceName(serviceName), m_pServiceCentre(nullptr) {};
-	~BaseService() = default;
 
 	//IService½Ó¿Ú
 	virtual const std::string GetName() const
@@ -18,6 +17,7 @@ public:
         if(!pOwner) return false;
         
         m_pServiceCentre = pOwner;
+        std::cout << "Service: " << m_ServiceName << " Loaded." << std::endl;
         
         return true;
     }
@@ -32,6 +32,7 @@ public:
 	virtual void Unload()
     {
         m_pServiceCentre = NULL;
+        std::cout << "Service: " << m_ServiceName << " Unloaded." << std::endl;
     }
     
 protected:

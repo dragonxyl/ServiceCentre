@@ -8,8 +8,8 @@
 void ServiceCentreApp::Load()
 {
 	std::string CommuSrvName = "CommuService";
-	//HttpTaskProcService  pCommu = new HttpTaskProcService(CommuSrvName.c_str());
-    //RegistService(CommuSrvName, dynamic_cast<IService*>(pCommu));
+    CommuService  *pCommu = new CommuService(CommuSrvName.c_str());
+    RegistService(CommuSrvName, dynamic_cast<IService*>(pCommu));
 
 	std::string AlgSrvName = "AlgorithmService";
     UserService::AlgorithmService * pAlg = new UserService::AlgorithmService(AlgSrvName.c_str());

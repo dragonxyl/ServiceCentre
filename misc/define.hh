@@ -4,6 +4,15 @@
 #include <stdio.h>
 #include <functional>
 #include <type_traits>
+#include <memory>
+
+#include <string>
+#include <iostream>
+
+#include <vector>
+#include <map>
+#include <set>
+#include <unordered_map>
 
 #define DECL_HELPER(X) std::decay<decltype(*X)>::type //通过类指针获取类名
 #define BINDCLASSFUNC1(cls,f) std::bind(&cls::f, this, std::placeholders::_1)

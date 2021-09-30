@@ -131,7 +131,8 @@ bool ServiceCentre::UnregistService(const std::string& serviceName, IService* pS
 
     if(auto sp = it->second.ServicePointer)
     {
-        sp->Unload();
+		std::cout << "service unregisted success: " << it->first << std::endl;
+		sp->Unload();
         delete sp;
         sp = nullptr;
     }
@@ -158,7 +159,7 @@ void ServiceCentre::InitializeServices()
 	// 通知所有服务初始化
 	for (auto it = m_ServiceTable.begin(); it != m_ServiceTable.end(); ++it)
 	{
-		auto Serv = it->second;
+		auto &Serv = it->second;
 		if (Serv.ServicePointer && !Serv.Initialized)
 		{
 			Serv.ServicePointer->Initialize();
@@ -172,7 +173,7 @@ void ServiceCentre::FinalizeServices()
 	// 通知所有服务初始化
 	for (auto it = m_ServiceTable.begin(); it != m_ServiceTable.end(); ++it)
 	{
-		auto Serv = it->second;
+		auto &Serv = it->second;
 		if (Serv.ServicePointer && !Serv.Started && Serv.Initialized)
 		{
     		Serv.Initialized = false;
@@ -187,7 +188,7 @@ void ServiceCentre::StartServices()
 	// 通知所有服务启动
 	for (auto it = m_ServiceTable.begin(); it != m_ServiceTable.end(); ++it)
 	{
-		auto Serv = it->second;
+		auto &Serv = it->second;
 		if (Serv.ServicePointer && Serv.Initialized && !Serv.Started)
 		{
 			Serv.ServicePointer->Start();
@@ -203,7 +204,7 @@ void ServiceCentre::StopServices()
 	// 通知所有服务停止
 	for (auto it = m_ServiceTable.begin(); it != m_ServiceTable.end(); ++it)
 	{
-		auto Serv = it->second;
+		auto &Serv = it->second;
 		if (Serv.ServicePointer && Serv.Started)
 		{
 			Serv.Started = false;

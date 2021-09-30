@@ -2,7 +2,7 @@
 #include "../interface/iTaskDispatcher.hh"
 #include <shared_mutex>
 #include <unordered_map>
-
+#include <vector>
 /*!
  * \page TaskDispatcher 任务分发器
  * <pre>
@@ -29,26 +29,26 @@
  *    脚本：通过外部脚本来处理对应请求（暂时没实现）
  * 6. 任务分发器0 被所有接收者共用，用于临时增加处理项
  * 7. 需要考虑多个异步请求的并行处理
+ * 8. 默认的任务被派发到同名的处理者，用户也可以设置任意的处理者来处理任务
  * </pre>
  *
  **/
 
-template <typename TASK>
-class TaskDispatcher : public ITaskDispatcher<TASK>
+class TaskDispatcher : public ITaskDispatcher
 {
 public:
 
 	struct TaskProcInfo
 	{
-		//std::string taskId;
+		std::string ProcessorId; //任务可能会派发给
 		ProcessType type;
-		ITaskProcessor<TASK>* TaskProcessorPointer;
+		ITaskProcessor* TaskProcessorPointer;
 		TaskProcInfo() = default;
-		TaskProcInfo(ITaskProcessor<TASK>* tpp, ProcessType tp) :TaskProcessorPointer(tpp), type(tp) {};
+		TaskProcInfo(ITaskProcessor* tpp, ProcessType tp) :TaskProcessorPointer(tpp), type(tp) {};
 	};
 
-	TaskDispatcher() = default;
-	~TaskDispatcher();
+	TaskDispatcher(const unsigned& key):DisperKey(key){};
+	virtual ~TaskDispatcher();
 
 	/*!
 	 * \fn unsigned getDisperKey
@@ -56,6 +56,7 @@ public:
 	 * \remarks 在服务中心在停止任务处理服务前，务必先反注册该接口
 	 **/
 	 //virtual const unsigned getDisperIndex();
+	virtual const unsigned getDisperKey() const { return DisperKey; };
 
 	 /*!
 	  * \fn void setProcessor
@@ -65,7 +66,7 @@ public:
 	  * \param[in] task 任务处理对象的指针
 	  * \param[in] task 任务处理方式
 	  **/
-	virtual void setProcessor(const std::string& taskKey, ITaskProcessor<TASK>* tp, ProcessType pt = PROCESS_SYNC);
+	virtual void setProcessor(const std::string& ProcKey, ITaskProcessor* tp, ProcessType pt = PROCESS_SYNC);
 
 	/*!
 	 * \fn void unsetProcessor(ITaskProcessor<T>* tp)
@@ -74,7 +75,7 @@ public:
 	 * \param[in] taskKey 任务键值
 	 * \param[in] task 任务处理对象的指针
 	 **/
-	virtual void unsetProcessor(const std::string& taskKey, ITaskProcessor<TASK>* tp);
+	virtual void unsetProcessor(const std::string& ProcKey, ITaskProcessor* tp);
 
 	/*!
 	 * \fn void unsetProcessor(ITaskProcessor<T>* tp)
@@ -91,7 +92,8 @@ public:
 	 * \param[in] const std::string& assignedProcessorKey = ""
 				  指定的处理者键值，默认为空根据任务名称直接匹配，也可指定
 	 **/
-	virtual void Dispatch(TASK* task);
+	 
+	virtual void Dispatch(const std::string& taskKey, void* task);
 
 private:
 	/*!
@@ -101,9 +103,8 @@ private:
 	 * \param[in] task 任务指针
 	 * \retrun  根据当前任务获取的处理者键值
 	 **/
-	virtual std::string GetRequestProc(TASK* task) { return ""; };
 
-	void ProcessGo(TaskProcInfo procInfo, TASK* task, void* context);
+	void ProcessGo(TaskProcInfo procInfo, void* task, void* context);
 
 	//读写锁
 	std::shared_mutex mtx;
@@ -111,131 +112,6 @@ private:
 	//以实现一个key 对应多个 处理者依次处理 
 	std::unordered_map<std::string, TaskProcInfo > m_dispatch_map;
 
+    const unsigned DisperKey;
+
 };
-
-
-template <typename TASK>
-TaskDispatcher<TASK>::~TaskDispatcher()
-{
-    std::unique_lock<std::shared_mutex> lck(mtx);
-    m_dispatch_map.clear();
-}
-
-template <typename TASK>
-void TaskDispatcher<TASK>::setProcessor(const std::string& taskKey, ITaskProcessor<TASK>* tp, ProcessType pt)
-{
-    //注意动态加载可能发生在不同线程中 加锁，防止在此时被卸载
-    std::unique_lock<std::shared_mutex> lck(mtx);
-    const auto it = m_dispatch_map.find(taskKey);
-
-    if(it != m_dispatch_map.end())
-    {
-        DBG("taskKey: %s collide",taskKey.c_str());
-    }
-    else
-    {
-        m_dispatch_map.emplace(taskKey, TaskProcInfo(tp,pt));
-    }
-    
-}
-
-template <typename TASK>
-void TaskDispatcher<TASK>::unsetProcessor(const std::string& taskKey, ITaskProcessor<TASK>* tp)
-{
-    //注意卸载可能发生在不同线程加锁，防止在此时被卸载
-    std::unique_lock<std::shared_mutex> lck(mtx);
-    auto it = m_dispatch_map.find(taskKey);
-    if(it != m_dispatch_map.end())
-    {
-        m_dispatch_map.erase(it);
-    }
-
-}
-
-template <typename TASK>
-void TaskDispatcher<TASK>::Dispatch(TASK* task)
-{
-    TaskProcInfo tempTpi;
-    std::string key = GetRequestProc(task);
-    
-    if(key.empty())
-    {
-        DBG("Key info is empty");
-    }
-
-    //注意卸载可能发生在不同线程加锁，防止在此时被卸载
-    {
-        std::shared_lock<std::shared_mutex> lck(mtx);
-        auto it = m_dispatch_map.find(key);
-        if(it!= m_dispatch_map.end()) 
-        {
-            tempTpi.TaskProcessorPointer = it->second.TaskProcessorPointer;
-            tempTpi.type                 = it->second.type;
-        }
-        else
-        {
-            DBG("cannot find Processor for apply with key:%s",key.c_str());
-            return;
-        }
-    }
-
-    if(tempTpi.type == PROCESS_SYNC)
-    {
-        tempTpi.TaskProcessorPointer->ProcessTask(task);
-    }
-    else if(tempTpi.type == PROCESS_ASYNC)
-    {
-        WFCounterTask *counter =  WFTaskFactory::create_counter_task(1, nullptr);
-        WFGoTask *goTask = WFTaskFactory::create_go_task("go", &TaskDispatcher::ProcessGo, this,tempTpi, task,counter);
-        
-        SeriesWork *series = series_of(task);
-        *series << counter;
-        goTask->start();
-    }
-    else
-    {
-        //PROCESS_SCRIPT
-    }
-}
-
-template <typename TASK>
-void TaskDispatcher<TASK>::ProcessGo(TaskProcInfo procInfo, TASK* task, void* context)
-{
-    procInfo.TaskProcessorPointer->ProcessTask(task);
-    static_cast<WFCounterTask*>(context)->count();
-}
-
-
-using HttpTaskDispatcher = TaskDispatcher<WFHttpTask>;
-
-/*!
- * \fn void GetRequestProc
- * \brief http任务获取任务处理者键值
- * \remarks /algorithm 则返回algorithm
- *          /task/abc  则返回task
- * \param[in] task 任务指针
- * \retrun  根据当前任务获取的处理者键值
- **/
-template <>
-std::string HttpTaskDispatcher::GetRequestProc(WFHttpTask* task)
-{
-    const std::string reqFunc = task->get_req()->get_request_uri();
-
-    if("/" == reqFunc) return "";
-
-    std::string str = reqFunc.substr(1);
-    
-    std::size_t found = str.find_first_of("/");
-    
-    if (found!=std::string::npos)
-    {
-        return str.substr(0,found);
-    }
-    else
-    {
-        return std::move(str);
-    }
-}
-
-
-
