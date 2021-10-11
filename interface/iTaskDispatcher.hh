@@ -15,6 +15,8 @@ enum ProcessType
 
 struct ITaskDispatcher
 {
+	virtual ~ITaskDispatcher() {};
+
     virtual const unsigned getDisperKey() const = 0;
 	/*!
 	 * \fn void setProcessor( std::string taskId, ITaskProcessor<T>* tp)

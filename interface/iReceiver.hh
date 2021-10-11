@@ -2,22 +2,22 @@
 
 #include "iService.hh"
 /*!
-	* \class IService
-	* \brief 服务接口
+	* \class IReceiver
+	* \brief 接收者接口
 	*/
 struct IServiceCentre;
 struct ITaskDispatcher;
 
 struct IReceiver: public IService
 {
-
+	virtual ~IReceiver() {};
 	/*!
 		* \fn GetName
 		* \brief 获得服务名
 		* \return 服务名字符串指针
 		* \remarks 服务名不能为空（空指针、空字符串）
 		*/
-	virtual const std::string GetName() const {return "";};
+	virtual const std::string GetName() const {return "IReceiver";};
 
 	/*!
 		* \fn Load

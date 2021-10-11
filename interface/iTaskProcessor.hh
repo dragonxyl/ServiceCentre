@@ -2,12 +2,15 @@
 
 #include "../misc/define.hh"
 
+#include "iSender.hh"
 /*!
 	* \interface ITaskProcessor
 	* \brief 任务处理接口，由 任务处理服务 实现
 	**/
 struct ITaskProcessor
 {
+	virtual ~ITaskProcessor() {};
+
 	/*!
 		* \fn void ProcessTask(void* task)
 		* \brief 处理任务
@@ -18,5 +21,7 @@ struct ITaskProcessor
 		* \param[in] task 根据模板指定的任务类型的指针
 		**/
 	virtual void ProcessTask(void* task) = 0;
+
+    virtual void SetSender(ISender* pSender) = 0;
 };
 

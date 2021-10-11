@@ -7,8 +7,9 @@
 bool CommuService::Initialize() 
 {
     LoadConfigFile();
-    GenarateDispatchers();
-    GenarateReceivers();
+    GenerateSender();
+    GenerateDispatchers();
+    GenerateReceivers();
 
     for(auto it: m_Receivers)
     {
@@ -46,6 +47,9 @@ void CommuService::Finalize()
     } 
     m_Receivers.clear();
     m_Dispatchers.clear();
+
+    delete m_pSender;
+    m_pSender = NULL;
 }
 
 void CommuService::LoadConfigFile()
@@ -53,22 +57,38 @@ void CommuService::LoadConfigFile()
     receiverToDispers[0].emplace( 0 );
 }
 
-//fllow the config file to construct Dispatchers
-void CommuService::GenarateDispatchers()
+void CommuService::SetDispatcherProcessor(std::shared_ptr<ITaskDispatcher> pDisp, const std::string& ProcKey, const std::string& ServiceName)
+{
+    IService *pServ = m_pServiceCentre->LookForService(ServiceName);
+    if (pServ)
+    {
+        ITaskProcessor* pTP = dynamic_cast<ITaskProcessor*>(pServ);
+        if (pTP)
+        {
+            pTP->SetSender(m_pSender);
+            pDisp->setProcessor(ProcKey, pTP);
+        }
+    }
+}
+
+//To construct Dispatchers from the config file
+void CommuService::GenerateDispatchers()
 {
     unsigned num = 1;
     for(unsigned i = 0; i<num; ++i)
     {
+        //add every dispatcher to the table
         m_Dispatchers.emplace_back(std::dynamic_pointer_cast<ITaskDispatcher>(std::make_shared<TaskDispatcher>(i)));
 
+        //this should be done by the function of dispatcher to get info from config file for every single dispatcher
         SetDispatcherProcessor(m_Dispatchers[i],"task","TaskService");
         SetDispatcherProcessor(m_Dispatchers[i],"algorithm","AlgorithmService");
 
     }
 }
 
-//fllow the config file to construct Receivers
-void CommuService::GenarateReceivers()
+//To construct Receivers from the config file
+void CommuService::GenerateReceivers()
 {
     unsigned num = 1;
     unsigned port = 20855;
@@ -83,12 +103,15 @@ void CommuService::GenarateReceivers()
     }
 }
 
-void CommuService::SetDispatcherProcessor(std::shared_ptr<ITaskDispatcher> pDisp, const std::string& ProcKey, const std::string& ServiceName)
+//To construct Sender from the config file
+void CommuService::GenerateSender()
 {
-    IService *pServ = m_pServiceCentre->LookForService(ServiceName);
-    if(pServ)
-    {
-        ITaskProcessor *pTP1 = dynamic_cast<ITaskProcessor*>(pServ);       
-        pDisp->setProcessor(ProcKey, pTP1);
-    }
+    m_pSender = new Sender();
+
+    std::string hostAddr = "http://127.0.0.1:80";
+    m_pSender->SetHostAddr(AlgorithmManager, hostAddr);
+    m_pSender->SetHostAddr(ScheduleCentre, hostAddr);
+    m_pSender->SetHostAddr(AlgorithmGateway, hostAddr);
+    m_pSender->SetHostAddr(VideoAnalyser, hostAddr);
 }
+

@@ -7,6 +7,8 @@
 	*/
 struct IServiceCentre
 {
+	virtual ~IServiceCentre() {};
+
 	/*!
 		* \fn GetArgument
 		* \brief 获取指定参数

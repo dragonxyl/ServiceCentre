@@ -10,6 +10,7 @@ struct IServiceCentre;
 
 struct IService
 {
+	virtual ~IService() {};
 
 	/*!
 		* \fn GetName

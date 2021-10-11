@@ -46,6 +46,7 @@ void TaskDispatcher::Dispatch(const std::string& taskKey, void* task)
     if(taskKey.empty())
     {
         DBG("Key info is empty");
+        return;
     }
 
     //注意卸载可能发生在不同线程加锁，防止在此时被卸载

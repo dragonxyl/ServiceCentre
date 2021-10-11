@@ -17,7 +17,7 @@ namespace UserService {
     	//IService½Ó¿Ú
  //   	virtual bool Initialize();
 
-    	virtual bool Start();
+    	//virtual bool Start();
 
     	//virtual bool Stop();
 
@@ -29,5 +29,10 @@ namespace UserService {
     private:
 
         void FUNCtest(WFHttpTask* task);
+        void FUNCadd(WFHttpTask* task);
+        void FUNCdelete(WFHttpTask* task);
+        void FUNCstart(WFHttpTask* task);
+        void FUNCstop(WFHttpTask* task);
+        void FUNCrefresh(WFHttpTask* task);
     }; 
 }

@@ -25,5 +25,16 @@ namespace UserService {
 	private:
 
 		void FUNCtest(WFHttpTask* task);
+
+		void getInitTaskInfo();
+
+		void saveTaskInfo();
+
+
+	private:
+
 	};
+
+
+
 }
