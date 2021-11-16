@@ -5,3 +5,5 @@
 //Users
 #include "UserService/AlgorithmService.hh"
 #include "UserService/TaskService.hh"
+#include "UserService/DefaultService.hh"
+#include "UserService/FileService.hh"

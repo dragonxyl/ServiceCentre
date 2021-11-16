@@ -5,19 +5,23 @@
 class BaseService:public IService
 {
 public:
-    BaseService(const char* serviceName) :m_ServiceName(serviceName), m_pServiceCentre(nullptr) {};
+    BaseService(const char* serviceName) :service_name_(serviceName), p_service_centre_(nullptr) {};
+    virtual ~BaseService() = default;
 
-	//IService接口
-	virtual const std::string GetName() const
+    //IService接口
+    virtual const std::string GetName() const
     {
-        return m_ServiceName;
+        return service_name_;
     }
-	virtual bool Load(IServiceCentre* pOwner)
+    virtual bool Load(IServiceCentre* p_owner)
     {
-        if(!pOwner) return false;
+        if(!p_owner) return false;
         
-        m_pServiceCentre = pOwner;
-        std::cout << "Service: " << m_ServiceName << " Loaded." << std::endl;
+        p_service_centre_ = p_owner;
+
+        path_ = p_service_centre_->get_exe_path_();
+
+        std::cout << "Service: " << service_name_ << " Loaded." << std::endl;
         
         return true;
     }
@@ -27,16 +31,17 @@ public:
 
     virtual bool Stop() { return true; };
 
-	virtual void Finalize(){};
+    virtual void Finalize(){};
     
-	virtual void Unload()
+    virtual void Unload()
     {
-        m_pServiceCentre = NULL;
-        std::cout << "Service: " << m_ServiceName << " Unloaded." << std::endl;
+        p_service_centre_ = NULL;
+        std::cout << "Service: " << service_name_ << " Unloaded." << std::endl;
     }
     
 protected:
-    IServiceCentre* m_pServiceCentre; 
+    IServiceCentre* p_service_centre_; 
 
-    const std::string m_ServiceName;
+    const std::string service_name_;
+    const char* path_;
 }; 

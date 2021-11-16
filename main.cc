@@ -1,134 +1,68 @@
 #include <iostream>
+#include <signal.h>
+#include <locale>
+
 #include <string>
-#include <csignal>
-
-#include "workflow/Workflow.h"
-
-#include "workflow/HttpMessage.h"
-#include "workflow/HttpUtil.h"
-#include "workflow/WFServer.h"
-#include "workflow/WFHttpServer.h"
+#include <mutex>
+#include <condition_variable>
 
 #include "ServiceCentreApp.hh"
-
-
-void process(WFHttpTask* server_task)
+static std::mutex g_mutex;
+static std::condition_variable g_cond;
+void sig_handler(int signo) 
 {
-	protocol::HttpRequest* req = server_task->get_req();
-	protocol::HttpResponse* resp = server_task->get_resp();
-	long long seq = server_task->get_task_seq();
-	protocol::HttpHeaderCursor cursor(req);
-	std::string name;
-	std::string value;
-	char buf[8192];
-	int len;
-
-	printf("Func:%s Task %s ---- Current Task ID is %ld.\n", __func__, req->get_request_uri(), GetCurrentThreadId());
-
-	if (strncmp(req->get_request_uri(), "/favicon.ico", 12) == 0)
-	{
-		return;
-	}
-	else if (strncmp(req->get_request_uri(), "/good", 5) != 0)
-	{
-		fprintf(stderr, "URI:%s is not match.\n",
-			req->get_request_uri());
-		resp->set_status_code("404");
-		resp->set_reason_phrase("Page not found.");
-
-		return;
-	}
-
-
-	/* Set response message body. */
-	resp->append_output_body_nocopy("<html>", 6);
-	len = snprintf(buf, 8192, "<p>%s %s %s</p>", req->get_method(),
-		req->get_request_uri(), req->get_http_version());
-	resp->append_output_body(buf, len);
-
-	while (cursor.next(name, value))
-	{
-		len = snprintf(buf, 8192, "<p>%s: %s</p>", name.c_str(), value.c_str());
-		resp->append_output_body(buf, len);
-	}
-
-	resp->append_output_body_nocopy("</html>", 7);
-
-	/* Set status line if you like. */
-	resp->set_http_version("HTTP/1.1");
-	resp->set_status_code("200");
-	resp->set_reason_phrase("OK");
-
-	resp->add_header_pair("Content-Type", "text/html");
-	resp->add_header_pair("Server", "Sogou WFHttpServer");
-	if (seq == 9) /* no more than 10 requests on the same connection. */
-		resp->add_header_pair("Connection", "close");
-
-	/* print some log */
-	char addrstr[128];
-	struct sockaddr_storage addr;
-	socklen_t l = sizeof addr;
-	unsigned short port = 0;
-
-	server_task->get_peer_addr((struct sockaddr*)&addr, &l);
-	if (addr.ss_family == AF_INET)
-	{
-		struct sockaddr_in* sin = (struct sockaddr_in*)&addr;
-		inet_ntop(AF_INET, &sin->sin_addr, addrstr, 128);
-		port = ntohs(sin->sin_port);
-	}
-	else if (addr.ss_family == AF_INET6)
-	{
-		struct sockaddr_in6* sin6 = (struct sockaddr_in6*)&addr;
-		inet_ntop(AF_INET6, &sin6->sin6_addr, addrstr, 128);
-		port = ntohs(sin6->sin6_port);
-	}
-	else
-		strcpy(addrstr, "Unknown");
-
-	fprintf(stderr, "Peer address: %s:%d, seq: %lld.\n",
-		addrstr, port, seq);
+    std::unique_lock<std::mutex> lck(g_mutex);
+    g_cond.notify_all();
 }
 
-void sig_handler(int signo) { }
 
+void Init(IServiceCentre& app, int argc, const char* argv[])
+{
+#ifdef LINUX
+    if (app.GetArgument("-d"))
+    {
+        // 转换为 daemon
+        daemon(1, 1);
+    }
+#endif
 
+    /*
+     * 注册Ctrl+C
+     */
+#ifdef _WIN32
+    signal(SIGINT, sig_handler);
+    signal(SIGTERM, sig_handler);
+#else
+    memset(&sighandler, 0, sizeof(struct sigaction));
+    sighandler.sa_handler = sig_handler;
+    sigaction(SIGINT, &sighandler, NULL);
+    sigaction(SIGTERM, &sighandler, NULL);
+    signal(SIGPIPE, SIG_IGN);
+#endif
 
-
+    // 允许中文打印
+#ifdef _WIN32
+    setlocale(LC_ALL, "chs");
+#else
+    setlocale(LC_ALL, "zh_CN");
+#endif
+}
 
 int main(int argc, const char* argv[])
 {
+    ServiceCentreApp SCA(argc, argv);
 
-
-	ServiceCentreApp SCA(argc - 1, argv + 1);
+    Init(SCA, argc, argv);
 
     SCA.Start();
+    printf("Func:%s  ---- Current Task ID is %ld.\n", __func__, GetCurrentThreadId());
 
+    std::unique_lock<std::mutex> lck(g_mutex);
+    g_cond.wait(lck);
 
-	signal(SIGINT, sig_handler);
+    SCA.Stop();
+    std::cout << "ServiceCentreApplication Terminated." << std::endl;
 
-
-	printf("Func:%s  ---- Current Task ID is %ld.\n", __func__, GetCurrentThreadId());
-
-
-	if (1)
-	{
-#ifndef _WIN32
-		pause();
-#else
-		getchar();
-#endif
-		SCA.Stop();
-	}
-	else
-	{
-		perror("Cannot start server");
-		exit(1);
-	}
-
-
-	getchar();
-
-	return 0;
+    return 0;
 }
 

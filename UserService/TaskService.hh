@@ -1,40 +1,41 @@
 #pragma once
-
+#include <vector>
 
 #include "../Base/CommTaskProcService.hh"
+#include "../protocol/protocol.hh"
 
-namespace UserService {
+#define DEFINE_PREFIXED_FUNC_TASKSERV(NAME) DEFINE_PREFIXED_FUNC_HTTP(TaskService,NAME)
 
-	class TaskService :public HttpTaskProcService
-	{
+namespace user_service {
 
-		// using std::function< void(TaskType* )> = func;
-	public:
-		TaskService(const char* serviceName) : HttpTaskProcService(serviceName) {};
-		TaskService() = default;
+class TaskService :public HttpTaskProcService
+{
+    friend class TaskServiceImpl;
+public:
+    TaskService(const char* serviceName);
+    virtual ~TaskService();
 
+    //IService接口
+//    virtual bool Initialize() override;
 
-		//IService接口
-//		virtual bool Initialize();
+//    virtual bool Start() override;
 
-		virtual bool Start();
+protected:
+    virtual void SetFunctors() override;
+    //virtual void funcRoot(WFHttpTask* task) override;
+private:
 
-	protected:
-		virtual void SetFunctors();
+    DECLARE_PREFIXED_FUNC_HTTP(test)
+    {
+        std::cout << "This is a test Function: " << __func__ << " in TaskServices with pid= " << GetCurrentThreadId() << std::endl;
+    }
 
-	private:
+    DECLARE_PREFIXED_FUNC_HTTP(start);
+    DECLARE_PREFIXED_FUNC_HTTP(stop);
 
-		void FUNCtest(WFHttpTask* task);
+private:
+    //TaskServiceImpl* pImpl_;
+    std::unique_ptr<TaskServiceImpl> p_impl_;
 
-		void getInitTaskInfo();
-
-		void saveTaskInfo();
-
-
-	private:
-
-	};
-
-
-
+};
 }

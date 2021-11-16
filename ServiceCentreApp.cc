@@ -1,24 +1,34 @@
+#pragma once
 #include <iostream>
 #include <climits>
 
 #include "ServiceCentreApp.hh"
 #include "Services.hh"
 
+ServiceCentreApp::ServiceCentreApp(int argc, const char* argv[]) :ServiceCentre(argc, argv) 
+{
+    const char* commu_srv_name = "CommuService";
+    RegistService(std::string(commu_srv_name), dynamic_cast<IService*>(new CommuService(commu_srv_name)));
+
+    const char* default_srv_name = "DefaultService";
+    RegistService(std::string(default_srv_name), dynamic_cast<IService*>(new HttpTaskProcService(default_srv_name)));
+}
 
 void ServiceCentreApp::Load()
 {
-	std::string CommuSrvName = "CommuService";
-    CommuService  *pCommu = new CommuService(CommuSrvName.c_str());
-    RegistService(CommuSrvName, dynamic_cast<IService*>(pCommu));
+    const char* usr_dft_srv_name = "UserDefaultService";
+    RegistService(std::string(usr_dft_srv_name), dynamic_cast<IService*>(new user_service::DefaultService(usr_dft_srv_name)));
 
-	std::string AlgSrvName = "AlgorithmService";
-    UserService::AlgorithmService * pAlg = new UserService::AlgorithmService(AlgSrvName.c_str());
-    RegistService(AlgSrvName, dynamic_cast<IService*>(pAlg));
+    const char* alg_srv_name = "AlgorithmService";
+    RegistService(std::string(alg_srv_name), dynamic_cast<IService*>(new user_service::AlgorithmService(alg_srv_name)));
 
-	std::string TaskSrvName = "TaskService";
-    UserService::TaskService *pTask = new UserService::TaskService(TaskSrvName.c_str());
-    RegistService(TaskSrvName, dynamic_cast<IService*>(pTask));
+    const char* task_srv_name = "TaskService";
+    RegistService(std::string(task_srv_name), dynamic_cast<IService*>(new user_service::TaskService(task_srv_name)));
+
+    const char* file_srv_name = "FileService";
+    RegistService(std::string(file_srv_name), dynamic_cast<IService*>(new user_service::FileService(file_srv_name)));
 }
+
 void ServiceCentreApp::Unload()
 {
     for(auto& it: m_ServiceTable)
@@ -35,27 +45,27 @@ void ServiceCentreApp::Unload()
 }
 
 /*
-	* 启动所有模块
-	*/
+    * 启动所有模块
+    */
 void ServiceCentreApp::Start()
 {
     Load();
 
     Initialize();
 
-	ServiceCentre::Start();
+    ServiceCentre::Start();
 
 }
 
 /*
-	* 停止所有服务
-	*/
+    * 停止所有服务
+    */
 void ServiceCentreApp::Stop()
 {
-	// 通知所有服务停止
-	ServiceCentre::Stop();
-	
-	Finalize();
-	
-    Unload();		
+    // 通知所有服务停止
+    ServiceCentre::Stop();
+    
+    Finalize();
+    
+    Unload();        
 }

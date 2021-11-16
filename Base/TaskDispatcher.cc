@@ -3,6 +3,11 @@
 #include "workflow/WFTaskFactory.h"
 #include "workflow/workflow.h"
 
+TaskDispatcher::TaskDispatcher(const unsigned& key, ITaskProcessor* default_proc) :DisperKey(key)
+{
+    setProcessor("",default_proc);
+};
+
 TaskDispatcher::~TaskDispatcher()
 {
     std::unique_lock<std::shared_mutex> lck(mtx);
@@ -18,7 +23,15 @@ void TaskDispatcher::setProcessor(const std::string& ProcKey, ITaskProcessor* tp
 
     if(it != m_dispatch_map.end())
     {
-        DBG("taskKey: %s collide", ProcKey.c_str());
+        //默认处理模块覆盖
+        if (ProcKey.empty())
+        {
+            m_dispatch_map[""] = TaskProcInfo(tp, pt);
+        }
+        else
+        {
+            DBG("taskKey: %s collide", ProcKey.c_str());
+        }
     }
     else
     {
@@ -43,12 +56,6 @@ void TaskDispatcher::Dispatch(const std::string& taskKey, void* task)
 {
     TaskProcInfo tempTpi;
 
-    if(taskKey.empty())
-    {
-        DBG("Key info is empty");
-        return;
-    }
-
     //注意卸载可能发生在不同线程加锁，防止在此时被卸载
     {
         std::shared_lock<std::shared_mutex> lck(mtx);
@@ -57,10 +64,20 @@ void TaskDispatcher::Dispatch(const std::string& taskKey, void* task)
         {
             tempTpi = it->second;
         }
+        //无法识别的key，送到默认处理模块处理
         else
         {
-            DBG("cannot find Processor for apply with key:%s", taskKey.c_str());
-            return;
+            auto it_default = m_dispatch_map.find("");
+            if (it_default != m_dispatch_map.end())
+            {
+                tempTpi = it_default->second;
+            }
+            //对于每个分配器，如果没有指定的默认处理模块，都会指定统一的默认处理模块，此时说明程序内在有问题
+            else
+            {
+                DBG("cannot find Default Processor for unknown key:%s", taskKey.c_str());
+                return;
+            }
         }
     }
 
@@ -68,7 +85,8 @@ void TaskDispatcher::Dispatch(const std::string& taskKey, void* task)
     {
         tempTpi.TaskProcessorPointer->ProcessTask(task);
     }
-    else if(tempTpi.type == PROCESS_ASYNC)
+    //借助框架实现异步处理
+    else// if(tempTpi.type == PROCESS_ASYNC)
     {
         WFCounterTask *counter =  WFTaskFactory::create_counter_task(1, nullptr);
         WFGoTask *goTask = WFTaskFactory::create_go_task("go", &TaskDispatcher::ProcessGo, this,tempTpi, task,counter);
@@ -76,10 +94,6 @@ void TaskDispatcher::Dispatch(const std::string& taskKey, void* task)
         SeriesWork *series = series_of((SubTask*)task);
         *series << counter;
         goTask->start();
-    }
-    else
-    {
-        //PROCESS_SCRIPT
     }
 }
 

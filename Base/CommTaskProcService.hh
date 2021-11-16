@@ -8,14 +8,14 @@
 #include "workflow/WFTaskFactory.h"
 
 
-template <typename TASK>
-class CommTaskProcService:public BaseService, public TaskProcessor<TASK>
+template <typename Task>
+class CommTaskProcService:public BaseService, public TaskProcessor<Task>
 {
 public:
     CommTaskProcService(const char* serviceName) :BaseService(serviceName) {};
-	~CommTaskProcService() = default;
+    virtual ~CommTaskProcService() = default;
 
-	virtual bool Initialize() { SetFunctors(); return true; }
+    virtual bool Initialize() { SetFunctors(); return true; }
 
 }; 
 

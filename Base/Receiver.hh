@@ -1,11 +1,13 @@
 #pragma once
 #include "../interface/iTaskDispatcher.hh"
 #include "../interface/iReceiver.hh"
-#include "../interface/iSender.hh"
 
 #include "workflow/WFServer.h"
 #include "workflow/HttpMessage.h"
 #include "workflow/HttpUtil.h"
+
+#include <shared_mutex>
+#include <unordered_map>
 
 template<class REQ, class RESP> 
 class Receiver: public IReceiver
@@ -22,7 +24,7 @@ public:
     static constexpr struct WFServerParams SERVER_PARAMS_CONFIG_DEFAULT =
     {
         /*  .max_connections        =   */  2000,
-        /*  .peer_response_timeout  =   */  10 * 1000,
+        /*  .peer_response_timeout  =   */  20 * 1000,
         /*  .receive_timeout        =   */  -1,
         /*  .keep_alive_timeout     =   */  60 * 1000,
         /*  .request_size_limit     =   */  (size_t)-1,
@@ -31,12 +33,14 @@ public:
 
     static constexpr struct ServerConfig SERVER_CONFIG_DEFAULT =
     { SERVER_PARAMS_CONFIG_DEFAULT,
-        /*	.server_port    		=	*/  80 };
+        /*    .server_port            =    */  80 };
 
-    Receiver(unsigned short port) { serverConfig.server_port = port; serverConfig.server_params = SERVER_PARAMS_CONFIG_DEFAULT; };
     Receiver() { serverConfig = SERVER_CONFIG_DEFAULT; };
+    Receiver(unsigned short port) { serverConfig.server_port = port; serverConfig.server_params = SERVER_PARAMS_CONFIG_DEFAULT; };
+    Receiver(unsigned short port, WFServerParams params) { serverConfig.server_port = port; serverConfig.server_params = params; }
 
-    void AddDispatcher(std::shared_ptr<ITaskDispatcher> disp);
+
+    void AddDispatcher(std::weak_ptr<ITaskDispatcher> disp);
 
     bool Initialize();
 
@@ -48,7 +52,7 @@ public:
 private:
     void serverProcHandler(TASK* task);
     
-	virtual std::string GetRequestProc(TASK* task) { return ""; };
+    virtual std::string GetRequestProc(TASK* task) { return ""; };
 
     std::unique_ptr<WFServer<REQ, RESP> > pServer;
 
@@ -92,16 +96,16 @@ void Receiver<REQ,RESP>::Finalize()
 }
 
 template<class REQ, class RESP>
-void Receiver<REQ,RESP>::AddDispatcher(std::shared_ptr<ITaskDispatcher> disp)
+void Receiver<REQ,RESP>::AddDispatcher(std::weak_ptr<ITaskDispatcher> disp)
 {
-    if(m_dispatchersSet.find(disp->getDisperKey()) == m_dispatchersSet.end())
+    if(m_dispatchersSet.find(disp.lock()->getDisperKey()) == m_dispatchersSet.end())
     {
         m_dispatchers.emplace_back(disp);
-        m_dispatchersSet.emplace(disp->getDisperKey());
+        m_dispatchersSet.emplace(disp.lock()->getDisperKey());
     }
     else
     {
-        DBG("DisperKey %u collides.",disp->getDisperKey());
+        DBG("DisperKey %u collides.",disp.lock()->getDisperKey());
     }
 }
 
@@ -133,79 +137,16 @@ using HttpReceiver = Receiver<protocol::HttpRequest,protocol::HttpResponse>;
 template <>
 std::string HttpReceiver::GetRequestProc(WFHttpTask* task)
 {
-    const std::string reqFunc = task->get_req()->get_request_uri();
+    std::string reqFunc = task->get_req()->get_request_uri()+1;
 
-    if("/" == reqFunc) return "";
-
-    std::string str = reqFunc.substr(1);
-    
-    std::size_t found = str.find_first_of("/");
+    std::size_t found = reqFunc.find_first_of("/");
     
     if (found!=std::string::npos)
     {
-        return str.substr(0,found);
+        return reqFunc.substr(0,found);
     }
     else
     {
-        return std::move(str);
+        return reqFunc;
     }
 }
-
-
-class Sender:public ISender
-{
-public:
-    virtual std::string GetHostAddr(const std::string& hostName);
-
-    virtual void SetHostAddr(const std::string& hostName, const std::string& hostAddr);
-    
-private:
-    std::unordered_map<std::string,std::string> m_routeMap;
-    
-	//读写锁
-	std::shared_mutex mtx;
-};
-
-std::string Sender::GetHostAddr(const std::string& hostName)
-{
-    std::shared_lock<std::shared_mutex> lck(mtx);
-    const auto it = m_routeMap.find(hostName);
-    if(it!= m_routeMap.end()) 
-    {
-        return it->second;
-    }
-    else
-    {
-        DBG("cannot find hostAddr for hostName:%s", hostName.c_str());
-        return "";
-    }
-}
-
-void Sender::SetHostAddr(const std::string& hostName, const std::string& hostAddr)
-{
-    if(hostName.empty())
-    {
-        DBG("hostName is empty when set routeMap");
-        return;
-    }
-    
-    if(hostAddr.empty())
-    {
-        auto it = m_routeMap.find(hostName);
-        if(it!= m_routeMap.end()) 
-        {
-            std::unique_lock<std::shared_mutex> lck(mtx);
-            m_routeMap.erase(it);
-        }
-        else
-        {
-            DBG("hostAddr is empty when set routeMap");
-            return;
-        }
-    }
-
-    //注意动态加载可能发生在不同线程中 加锁，防止在此时被卸载
-    std::unique_lock<std::shared_mutex> lck(mtx);
-    m_routeMap[hostName] = hostAddr;//相同则覆盖
-}
-
